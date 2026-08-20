@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT-HF Netzwerk-Simulator Pro</title>
+    <style>
+        :root {
+            --bg-color: #f4f6f9; --card-bg: #ffffff; --text-main: #2d3748;
+            --text-muted: #718096; --accent: #3182ce; --accent-hover: #2b6cb0;
+            --border-color: #e2e8f0; --success: #38a169; --danger: #e53e3e;
+            --router-bg: #ebf8ff; --router-border: #90cdf4; --table-head: #f8fafc;
+            --warning: #dd6b20;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a202c; --card-bg: #2d3748; --text-main: #f7fafc;
+            --text-muted: #a0aec0; --border-color: #4a5568; --router-bg: #2a4365;
+            --router-border: #63b3ed; --table-head: #1a202c;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+        body { background-color: var(--bg-color); color: var(--text-main); padding: 20px; line-height: 1.5; transition: 0.3s; }
+        .container { width: 96%; max-width: 1600px; margin: 0 auto; position: relative; }
+        header { text-align: center; margin-bottom: 30px; }
+        #theme-toggle { position: absolute; top: 0; right: 0; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 20px; cursor: pointer; }
+
+        .tabs { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; overflow-x: auto; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; background: none; border: none; font-size: 16px; font-weight: 600; color: var(--text-muted); border-bottom: 2px solid transparent; transition: 0.2s; white-space: nowrap; }
+        .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .card { background-color: var(--card-bg); border-radius: 8px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 20px; overflow-x: auto; }
+        .card h2 { font-size: 18px; margin-bottom: 15px; border-left: 4px solid var(--accent); padding-left: 10px; }
+
+        input, select { padding: 8px; border: 1px solid var(--border-color); border-radius: 6px; background-color: var(--bg-color); color: var(--text-main); width: 100%; outline: none; }
+        input:focus, select:focus { border-color: var(--accent); }
+        button { padding: 8px 16px; background-color: var(--accent); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:hover { background-color: var(--accent-hover); }
+        .btn-danger { background-color: var(--danger); }
+        .btn-danger:hover { background-color: #c53030; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; min-width: 600px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 14px; }
+        th { background-color: var(--table-head); color: var(--text-muted); font-weight: 600; }
+        
+        .code-font { font-family: monospace; font-size: 14px; letter-spacing: 1px; color: var(--accent); }
+
+        .svg-container { width: 100%; background-color: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; cursor: crosshair; user-select: none; overflow: hidden; }
+        .router-node { fill: var(--router-bg); stroke: var(--router-border); stroke-width: 3; cursor: grab; }
+        .router-node:active { cursor: grabbing; }
+        
+        .editable-text { cursor: pointer; pointer-events: all; transition: 0.2s; }
+        .editable-text:hover { fill: var(--accent-hover); text-decoration: underline; }
+        .router-text { font-size: 16px; font-weight: bold; fill: var(--text-main); text-anchor: middle; dominant-baseline: middle; pointer-events: all; cursor: pointer; }
+        .router-text:hover { fill: var(--accent); }
+        
+        .ip-text { 
+            font-size: 12px; fill: #e53e3e; font-weight: bold; pointer-events: all; cursor: pointer;
+            paint-order: stroke fill; stroke: var(--card-bg); stroke-width: 4px; stroke-linecap: round; stroke-linejoin: round; transition: 0.2s;
+        }
+        .ip-text:hover { fill: var(--accent); stroke: var(--card-bg); }
+        .connection-line { stroke: var(--border-color); stroke-width: 2.5; transition: 0.3s; }
+        
+        .nat-table th { text-align: center; }
+        .nat-table td { padding: 4px 8px; }
+        .nat-header { background-color: #e2e8f0; font-weight: bold; text-align: center; padding: 10px; margin-top: 20px;}
+        .nat-packet-box { border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; margin-bottom: 10px; background-color: var(--bg-color); }
+        .nat-packet-box table { min-width: auto; margin-top: 0; }
+        .nat-packet-box td { border: none; padding: 4px; font-size: 14px; }
+        .highlight-nat { color: var(--accent); font-weight: bold; }
+        .svg-nat-text { font-size: 12px; fill: var(--text-main); }
+        .svg-nat-val { font-weight: bold; fill: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <button id="theme-toggle" onclick="toggleTheme()">🌓 Dark Mode</button>
+    <header>
+        <h1>IT-HF Netzwerk-Simulator Pro</h1>
+        <p>Subnetting, VLSM, Routing Topologien & NAT Paketanalyse</p>
+    </header>
+
+    <div class="tabs">
+        <button class="tab-btn" onclick="switchTab('standard')">Standard Subnetting</button>
+        <button class="tab-btn" onclick="switchTab('vlsm')">VLSM Planer</button>
+        <button class="tab-btn active" onclick="switchTab('routing')">Routing & Topologie</button>
+        <button class="tab-btn" onclick="switchTab('nat')">NAT/PAT Paketanalyse</button>
+    </div>
+
+    <!-- TAB 1: STANDARD SUBNETTING -->
+    <div id="standard" class="tab-content">
+        <div class="card">
+            <h2>IP & Subnetz Parameter</h2>
+            <div style="display:flex; gap:15px; max-width: 500px; margin-bottom: 15px;">
+                <div style="flex: 2;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">IPv4-Adresse</label>
+                    <input type="text" id="std-ip" value="172.16.1.166" oninput="saveAndCalcStd()">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">CIDR (/x)</label>
+                    <input type="number" id="std-cidr" min="1" max="32" value="25" oninput="saveAndCalcStd()">
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Erweiterte Analyse</h2>
+            <table style="min-width: 100%;">
+                <tbody id="std-results"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 2: VLSM PLANER -->
+    <div id="vlsm" class="tab-content">
+        <div class="card">
+            <h2>Basisnetz (Ausgangslage)</h2>
+            <div style="display:flex; gap:15px; max-width: 500px; margin-bottom: 15px;">
+                <div style="flex: 2;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Basis IP-Adresse</label>
+                    <input type="text" id="vlsm-base-ip" value="172.16.0.0" oninput="saveData(); calculateVlsm();">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size:12px; font-weight:bold; color:var(--text-muted);">Basis CIDR (/x)</label>
+                    <input type="number" id="vlsm-base-cidr" min="8" max="30" value="16" oninput="saveData(); calculateVlsm();">
+                </div>
+            </div>
+            <div id="vlsm-capacity-warning" style="color: var(--danger); font-weight: bold; margin-top: 10px; display: none;">
+                Achtung: Die benötigten Subnetze überschreiten die Kapazität des Basisnetzes!
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Standorte / Subnetze konfigurieren</h2>
+            <div id="vlsm-hosts-container"></div>
+            <button onclick="addVlsmRow()" style="margin-top: 10px;">+ Weiteren Standort hinzufügen</button>
+            <table style="margin-top:20px;">
+                <thead>
+                    <tr><th>Standort</th><th>Benötigt</th><th>Effektive Hosts</th><th>Netz-Adresse</th><th>CIDR & Maske</th><th>Broadcast</th></tr>
+                </thead>
+                <tbody id="vlsm-results"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- TAB 3: ROUTING & TOPOLOGIE -->
+    <div id="routing" class="tab-content active">
+        <div class="card">
+            <h2>Netzwerk-Topologie (Interaktiver Editor)</h2>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">
+                💡 <strong>Tipp:</strong> Klicke direkt in der Grafik auf Router-Namen, Netzwerke (schwarz) oder Interface-IPs (rot), um die Werte visuell anzupassen. Die Tabellen updaten sich automatisch!
+            </p>
+            <div class="svg-container">
+                <svg id="network-svg" viewBox="0 0 900 800" style="height: 650px; width: 100%;"></svg>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <h2>Routing-Tabelle bearbeiten</h2>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="router-select" style="width: 150px; font-weight: bold;" onchange="loadRouterTable()"></select>
+                    <button onclick="createNewRouter()" style="background-color: var(--success);">+ Neuer Router</button>
+                    <button onclick="deleteCurrentRouter()" class="btn-danger">Router löschen</button>
+                </div>
+            </div>
+            <table id="dynamic-routing-table">
+                <thead>
+                    <tr>
+                        <th>Network</th>
+                        <th>Subnetmask</th>
+                        <th>Gateway (Next Hop)</th>
+                        <th>Interface (Lokale IP)</th>
+                        <th>Metric</th>
+                        <th style="width: 50px;">Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="route-tbody"></tbody>
+            </table>
+            <button onclick="addRoute()" style="margin-top: 15px;">+ Neue Route anfügen</button>
+        </div>
+
+        <div class="card">
+            <h2>Routing-Tabellen Export</h2>
+            <button onclick="exportRoutingTables()" style="background-color: var(--success);">Alle Tabellen als Text generieren</button>
+            <button onclick="resetToExercise()" class="btn-danger" style="margin-left: 10px;">Auf Übung 2 zurücksetzen</button>
+            <div id="routing-table-output" style="display:none; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 6px; padding: 15px; margin-top: 15px; font-family: monospace; white-space: pre-wrap; font-size: 13px; overflow-x: auto;"></div>
+        </div>
+    </div>
+
+    <!-- TAB 4: NAT / PAT -->
+    <div id="nat" class="tab-content">
+        <div class="card">
+            <h2>NAT/PAT Umsetzungstabelle konfigurieren</h2>
+            <table class="nat-table">
+                <thead>
+                    <tr>
+                        <th colspan="2" style="background-color:#e2e8f0; border-radius:6px 0 0 0;">Lokal / Privat (LAN)</th>
+                        <th colspan="2" style="background-color:#e2e8f0;">Global / Öffentlich (WAN)</th>
+                        <th style="background-color:#e2e8f0; border-radius:0 6px 0 0;">Ziel (Internet)</th>
+                        <th style="background-color:#e2e8f0;"></th>
+                    </tr>
+                    <tr>
+                        <th>Private IP</th>
+                        <th>Privater Port</th>
+                        <th>Öffentliche IP</th>
+                        <th>Öffentlicher Port</th>
+                        <th>Ziel IP</th>
+                        <th>X</th>
+                    </tr>
+                </thead>
+                <tbody id="nat-tbody"></tbody>
+            </table>
+            <button onclick="addNatEntry()" style="margin-top: 10px;">+ NAT-Eintrag hinzufügen</button>
+            
+            <div style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                <label style="display:inline-block; margin-right: 10px; font-weight:bold;">Globaler HTTP Server Port (Ziel-Port):</label>
+                <input type="text" id="nat-dest-port" value="80" style="width: 80px;" oninput="saveAndRenderNat()">
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--accent); padding-bottom: 10px; margin-bottom: 20px;">
+                <h2 style="border: none; margin: 0; padding: 0;">Paketanalyse (Interaktive Grafik)</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="font-weight: bold; color: var(--accent);">Welcher PC sendet?</label>
+                    <select id="nat-session-select" onchange="updateNatVisualization()" style="font-weight:bold; width: 250px;"></select>
+                </div>
+            </div>
+
+            <!-- Interaktive SVG NAT Grafik -->
+            <div class="svg-container" style="margin-bottom: 30px;">
+                <svg id="nat-diagram-svg" viewBox="0 0 1000 350" style="width: 100%; height: auto; display: block;">
+                    <defs>
+                        <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#3182ce" />
+                        </marker>
+                        <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 0 L 10 5 L 0 10 z" fill="#38a169" />
+                        </marker>
+                    </defs>
+
+                    <!-- Geräte -->
+                    <text x="120" y="160" font-size="50" text-anchor="middle">💻</text>
+                    <text x="120" y="200" font-weight="bold" text-anchor="middle" fill="var(--text-main)">Client (LAN)</text>
+                    <text id="svg-pc-ip" x="120" y="220" font-size="12" font-weight="bold" fill="#e53e3e" text-anchor="middle">192.168.1.12</text>
+
+                    <circle cx="500" cy="150" r="35" fill="var(--router-bg)" stroke="var(--router-border)" stroke-width="3"/>
+                    <path d="M 475 125 L 525 175 M 475 175 L 525 125" stroke="var(--router-border)" stroke-width="2"/>
+                    <text x="500" y="210" font-weight="bold" text-anchor="middle" fill="var(--text-main)">NAT/PAT Router</text>
+                    
+                    <text x="880" y="160" font-size="50" text-anchor="middle">🗄️</text>
+                    <text x="880" y="200" font-weight="bold" text-anchor="middle" fill="var(--text-main)">HTTP Server (WAN)</text>
+                    <text id="svg-server-ip" x="880" y="220" font-size="12" font-weight="bold" fill="#e53e3e" text-anchor="middle">65.30.34.3</text>
+
+                    <!-- Pfeile Hinweg -->
+                    <path d="M 160 120 Q 330 60 450 120" fill="none" stroke="#3182ce" stroke-width="2.5" stroke-dasharray="8,4" marker-end="url(#arrow-blue)"/>
+                    <path d="M 550 120 Q 715 60 840 120" fill="none" stroke="#3182ce" stroke-width="2.5" stroke-dasharray="8,4" marker-end="url(#arrow-blue)"/>
+
+                    <!-- Pfeile Rückweg -->
+                    <path d="M 840 170 Q 715 230 550 170" fill="none" stroke="#38a169" stroke-width="2.5" stroke-dasharray="8,4" marker-end="url(#arrow-green)"/>
+                    <path d="M 450 170 Q 330 230 160 170" fill="none" stroke="#38a169" stroke-width="2.5" stroke-dasharray="8,4" marker-end="url(#arrow-green)"/>
+
+                    <!-- Text Boxen Hinweg 1 -->
+                    <rect x="230" y="20" width="140" height="65" rx="4" fill="var(--card-bg)" stroke="#3182ce" stroke-width="1"/>
+                    <text x="240" y="38" class="svg-nat-text">Quell-IP: <tspan id="s-req1-sip" class="svg-nat-val"></tspan></text>
+                    <text x="240" y="53" class="svg-nat-text">Quell-Port: <tspan id="s-req1-sp" class="svg-nat-val"></tspan></text>
+                    <text x="240" y="68" class="svg-nat-text">Ziel-IP: <tspan id="s-req1-dip" class="svg-nat-val"></tspan></text>
+                    <text x="240" y="83" class="svg-nat-text">Ziel-Port: <tspan id="s-req1-dp" class="svg-nat-val"></tspan></text>
+
+                    <!-- Text Boxen Hinweg 2 -->
+                    <rect x="630" y="20" width="140" height="65" rx="4" fill="var(--card-bg)" stroke="#3182ce" stroke-width="1"/>
+                    <text x="640" y="38" class="svg-nat-text">Quell-IP: <tspan id="s-req2-sip" class="svg-nat-val" fill="#e53e3e"></tspan></text>
+                    <text x="640" y="53" class="svg-nat-text">Quell-Port: <tspan id="s-req2-sp" class="svg-nat-val" fill="#e53e3e"></tspan></text>
+                    <text x="640" y="68" class="svg-nat-text">Ziel-IP: <tspan id="s-req2-dip" class="svg-nat-val"></tspan></text>
+                    <text x="640" y="83" class="svg-nat-text">Ziel-Port: <tspan id="s-req2-dp" class="svg-nat-val"></tspan></text>
+
+                    <!-- Text Boxen Rückweg 1 -->
+                    <rect x="630" y="210" width="140" height="65" rx="4" fill="var(--card-bg)" stroke="#38a169" stroke-width="1"/>
+                    <text x="640" y="228" class="svg-nat-text">Quell-IP: <tspan id="s-res1-sip" class="svg-nat-val"></tspan></text>
+                    <text x="640" y="243" class="svg-nat-text">Quell-Port: <tspan id="s-res1-sp" class="svg-nat-val"></tspan></text>
+                    <text x="640" y="258" class="svg-nat-text">Ziel-IP: <tspan id="s-res1-dip" class="svg-nat-val"></tspan></text>
+                    <text x="640" y="273" class="svg-nat-text">Ziel-Port: <tspan id="s-res1-dp" class="svg-nat-val"></tspan></text>
+
+                    <!-- Text Boxen Rückweg 2 -->
+                    <rect x="230" y="210" width="140" height="65" rx="4" fill="var(--card-bg)" stroke="#38a169" stroke-width="1"/>
+                    <text x="240" y="228" class="svg-nat-text">Quell-IP: <tspan id="s-res2-sip" class="svg-nat-val"></tspan></text>
+                    <text x="240" y="243" class="svg-nat-text">Quell-Port: <tspan id="s-res2-sp" class="svg-nat-val"></tspan></text>
+                    <text x="240" y="258" class="svg-nat-text">Ziel-IP: <tspan id="s-res2-dip" class="svg-nat-val" fill="#e53e3e"></tspan></text>
+                    <text x="240" y="273" class="svg-nat-text">Ziel-Port: <tspan id="s-res2-dp" class="svg-nat-val" fill="#e53e3e"></tspan></text>
+                </svg>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px;">
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="nat-header" style="background-color: #bee3f8; color: #2a4365;">HINWEG (Request) ➡️</div>
+                    <div style="margin-top: 15px;">
+                        <strong>1. LAN:</strong>
+                        <div class="nat-packet-box">
+                            <table>
+                                <tr><td style="width: 90px; color:var(--text-muted);">Ziel-IP:</td><td id="hin1-zip"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-IP:</td><td id="hin1-qip"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Ziel-Port:</td><td id="hin1-zp"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-Port:</td><td id="hin1-qp"></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <strong>2. WAN (NAT übersetzt):</strong>
+                        <div class="nat-packet-box">
+                            <table>
+                                <tr><td style="width: 90px; color:var(--text-muted);">Ziel-IP:</td><td id="hin2-zip"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-IP:</td><td id="hin2-qip" class="highlight-nat"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Ziel-Port:</td><td id="hin2-zp"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-Port:</td><td id="hin2-qp" class="highlight-nat"></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="nat-header" style="background-color: #c6f6d5; color: #22543d;">⬅️ RÜCKWEG (Response)</div>
+                    <div style="margin-top: 15px;">
+                        <strong>3. WAN:</strong>
+                        <div class="nat-packet-box">
+                            <table>
+                                <tr><td style="width: 90px; color:var(--text-muted);">Ziel-IP:</td><td id="rueck1-zip"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-IP:</td><td id="rueck1-qip"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Ziel-Port:</td><td id="rueck1-zp"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-Port:</td><td id="rueck1-qp"></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <strong>4. LAN (NAT übersetzt zurück):</strong>
+                        <div class="nat-packet-box">
+                            <table>
+                                <tr><td style="width: 90px; color:var(--text-muted);">Ziel-IP:</td><td id="rueck2-zip" class="highlight-nat"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-IP:</td><td id="rueck2-qip"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Ziel-Port:</td><td id="rueck2-zp" class="highlight-nat"></td></tr>
+                                <tr><td style="color:var(--text-muted);">Quell-Port:</td><td id="rueck2-qp"></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- State Management ---
+    const defaultData = {
+        theme: 'light',
+        stdIp: '172.16.1.166', stdCidr: 25,
+        vlsmBaseIp: '172.16.0.0', vlsmBaseCidr: 16,
+        vlsmLocations: [{name: 'Zürich', hosts: 700}, {name: 'Luzern', hosts: 300}, {name: 'St. Gallen', hosts: 200}],
+        routers: [
+            { id: 'Router01', x: 450, y: 80, routes: [{ net: '172.16.0.0', mask: '255.255.0.0', gw: '172.16.0.1', int: '172.16.0.1', metric: 1 }, { net: '172.17.0.0', mask: '255.255.0.0', gw: '172.16.255.254', int: '172.16.0.1', metric: 2 }, { net: '172.20.0.0', mask: '255.255.0.0', gw: '172.20.0.1', int: '172.20.0.1', metric: 1 }] },
+            { id: 'Router02', x: 250, y: 250, routes: [{ net: '0.0.0.0', mask: '0.0.0.0', gw: '172.16.0.1', int: '172.16.255.254', metric: 20 }, { net: '172.17.0.0', mask: '255.255.0.0', gw: '172.17.0.1', int: '172.17.0.1', metric: 1 }] },
+            { id: 'Router03', x: 250, y: 480, routes: [{ net: '0.0.0.0', mask: '0.0.0.0', gw: '172.17.0.1', int: '172.17.255.254', metric: 20 }, { net: '172.18.0.0', mask: '255.255.0.0', gw: '172.18.0.1', int: '172.18.0.1', metric: 1 }] },
+            { id: 'Router04', x: 650, y: 250, routes: [{ net: '0.0.0.0', mask: '0.0.0.0', gw: '172.20.0.1', int: '172.20.255.254', metric: 20 }, { net: '172.21.0.0', mask: '255.255.0.0', gw: '172.21.0.1', int: '172.21.0.1', metric: 1 }] },
+            { id: 'Router05', x: 650, y: 480, routes: [{ net: '0.0.0.0', mask: '0.0.0.0', gw: '172.21.0.1', int: '172.21.255.254', metric: 20 }, { net: '172.22.0.0', mask: '255.255.0.0', gw: '172.22.0.1', int: '172.22.0.1', metric: 1 }] }
+        ],
+        natDestPort: '80',
+        natEntries: [
+            { privIp: '192.168.1.21', privPort: '1063', pubIp: '80.10.1.35', pubPort: '5001', destIp: '65.30.34.3' },
+            { privIp: '192.168.1.12', privPort: '1044', pubIp: '80.10.1.35', pubPort: '5034', destIp: '65.30.34.3' }
+        ]
+    };
+
+    let appState = JSON.parse(localStorage.getItem('netzwerkSimulatorPro')) || JSON.parse(JSON.stringify(defaultData));
+    let selectedRouterIdx = 0;
+
+    // Sicherstellen, dass Strukturen aus alten Speicherständen existieren (Fehlervermeidung!)
+    if (!appState.natEntries) appState.natEntries = JSON.parse(JSON.stringify(defaultData.natEntries));
+    if (!appState.routers) appState.routers = JSON.parse(JSON.stringify(defaultData.routers));
+    if (!appState.vlsmLocations) appState.vlsmLocations = JSON.parse(JSON.stringify(defaultData.vlsmLocations));
+
+    function saveData() { 
+        if(document.getElementById('std-ip')) {
+            appState.stdIp = document.getElementById('std-ip').value;
+            appState.stdCidr = document.getElementById('std-cidr').value;
+            appState.vlsmBaseIp = document.getElementById('vlsm-base-ip').value;
+            appState.vlsmBaseCidr = document.getElementById('vlsm-base-cidr').value;
+            
+            const vNames = document.querySelectorAll('.vlsm-name');
+            const vCounts = document.querySelectorAll('.vlsm-count');
+            appState.vlsmLocations = [];
+            for(let i=0; i<vNames.length; i++){
+                appState.vlsmLocations.push({name: vNames[i].value, hosts: parseInt(vCounts[i].value)||0});
+            }
+        }
+        if(document.getElementById('nat-dest-port')) {
+            appState.natDestPort = document.getElementById('nat-dest-port').value;
+        }
+        localStorage.setItem('netzwerkSimulatorPro', JSON.stringify(appState)); 
+    }
+
+    function toggleTheme() {
+        appState.theme = appState.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', appState.theme); saveData();
+    }
+    
+    function resetToExercise() {
+        if(confirm("Routing Topologie auf Übung 2 zurücksetzen? Eigene Router gehen verloren.")) {
+            appState.routers = JSON.parse(JSON.stringify(defaultData.routers));
+            selectedRouterIdx = 0; saveData(); initRoutingEditor();
+        }
+    }
+
+    window.onload = function() {
+        document.documentElement.setAttribute('data-theme', appState.theme);
+        
+        // Init Tabs 1 & 2
+        if(document.getElementById('std-ip')) {
+            document.getElementById('std-ip').value = appState.stdIp || '172.16.1.166';
+            document.getElementById('std-cidr').value = appState.stdCidr || 25;
+            saveAndCalcStd();
+            
+            document.getElementById('vlsm-base-ip').value = appState.vlsmBaseIp || '172.16.0.0';
+            document.getElementById('vlsm-base-cidr').value = appState.vlsmBaseCidr || 16;
+            appState.vlsmLocations.forEach(loc => addVlsmRowHTML(loc.name, loc.hosts));
+            calculateVlsm();
+        }
+
+        // Init Tab 3
+        initRoutingEditor();
+        initDragAndDrop();
+        
+        // Init Tab 4
+        document.getElementById('nat-dest-port').value = appState.natDestPort || '80';
+        renderNatTable();
+    };
+
+    function switchTab(t) {
+        document.querySelectorAll('.tab-content, .tab-btn').forEach(e => e.classList.remove('active'));
+        document.getElementById(t).classList.add('active'); event.currentTarget.classList.add('active');
+    }
+
+    // --- HELPER MATH ---
+    function ipToInt(ip){ const p=ip.split('.'); if(p.length!==4) return null; let v=0; for(let i=0;i<4;i++){ let o=parseInt(p[i]); if(isNaN(o)||o>255||o<0) return null; v=(v<<8)+o; } return v>>>0; }
+    function intToIp(i){ return [(i>>>24)&255,(i>>>16)&255,(i>>>8)&255,i&255].join('.'); }
+    function getMask(c){ return c===0 ? 0 : (~0<<(32-c))>>>0; }
+    function intToBinStr(i){ 
+        let bin = (i>>>0).toString(2).padStart(32, '0');
+        return `${bin.substr(0,8)}.${bin.substr(8,8)}.${bin.substr(16,8)}.${bin.substr(24,8)}`;
+    }
+    
+    function isIpInSubnet(ipStr, netStr, maskStr) {
+        let ip = ipToInt(ipStr); let net = ipToInt(netStr); let mask = ipToInt(maskStr);
+        if(ip === null || net === null || mask === null) return false;
+        return ((ip & mask) >>> 0) === (net >>> 0);
+    }
+    
+    function analyzeIp(ipStr) {
+        const parts = ipStr.split('.'); if(parts.length !== 4) return "-";
+        const first = parseInt(parts[0]), second = parseInt(parts[1]);
+        
+        let ipClass = "Unbekannt";
+        if(first >= 1 && first <= 126) ipClass = "Klasse A";
+        else if(first >= 128 && first <= 191) ipClass = "Klasse B";
+        else if(first >= 192 && first <= 223) ipClass = "Klasse C";
+        else if(first >= 224 && first <= 239) ipClass = "Klasse D (Multicast)";
+        else if(first >= 240 && first <= 255) ipClass = "Klasse E (Experimentell)";
+        
+        let type = "Öffentlich";
+        if(first === 10 || (first === 172 && second >= 16 && second <= 31) || (first === 192 && second === 168)) type = "Privat (LAN)";
+        else if(first === 127) type = "Loopback (Localhost)";
+        else if(first === 169 && second === 254) type = "APIPA (Link-Local)";
+
+        return `${ipClass} | ${type}`;
+    }
+
+    // --- TAB 1 & 2: SUBNETTING & VLSM ---
+    function saveAndCalcStd() {
+        saveData();
+        const ipStr = document.getElementById('std-ip').value;
+        const c = parseInt(document.getElementById('std-cidr').value);
+        const ip = ipToInt(ipStr);
+        if(ip === null || isNaN(c) || c < 0 || c > 32) return; 
+        
+        const m = getMask(c), s = (ip&m)>>>0, inv = (~m)>>>0, bcast = (s|inv)>>>0;
+        let hosts = c >= 31 ? 0 : Math.pow(2, 32-c) - 2;
+        
+        document.getElementById('std-results').innerHTML = `
+            <tr><td style="width:30%;"><strong>IP Analyse</strong></td><td>${analyzeIp(ipStr)}</td></tr>
+            <tr><td><strong>Netz-Adresse (ID)</strong></td><td>${intToIp(s)}</td></tr>
+            <tr><td><strong>Erste nutzbare IP</strong></td><td>${hosts > 0 ? intToIp(s+1) : '-'}</td></tr>
+            <tr><td><strong>Letzte nutzbare IP</strong></td><td>${hosts > 0 ? intToIp(bcast-1) : '-'}</td></tr>
+            <tr><td><strong>Broadcast-Adresse</strong></td><td>${intToIp(bcast)}</td></tr>
+            <tr><td><strong>Host-ID (Abstand)</strong></td><td>${intToIp(ip & inv)}</td></tr>
+            <tr><td><strong>Verfügbare Hosts</strong></td><td>${hosts.toLocaleString('de-CH')} (Total IPs: ${Math.pow(2, 32-c)})</td></tr>
+            <tr><td><strong>Subnetz-Maske</strong></td><td>${intToIp(m)}</td></tr>
+            <tr><td><strong>Wildcard-Maske</strong></td><td>${intToIp(inv)}</td></tr>
+            <tr><td colspan="2" style="background:var(--bg-color); padding-top:15px;"><strong>Binäre Ansicht</strong></td></tr>
+            <tr><td>IP Adresse binär</td><td class="code-font">${intToBinStr(ip)}</td></tr>
+            <tr><td>Subnetzmaske binär</td><td class="code-font">${intToBinStr(m)}</td></tr>
+            <tr><td>Netz-Adresse binär</td><td class="code-font">${intToBinStr(s)}</td></tr>
+        `;
+    }
+
+    function addVlsmRowHTML(name='', count='') {
+        const div = document.createElement('div');
+        div.style.cssText = "display:flex; gap:10px; margin-bottom:10px;";
+        div.innerHTML = `<input type="text" placeholder="Standort-Name" value="${name}" class="vlsm-name" style="flex:1;" oninput="saveData(); calculateVlsm();">
+                         <input type="number" placeholder="Hosts" value="${count}" class="vlsm-count" style="width:120px;" oninput="saveData(); calculateVlsm();">
+                         <button onclick="this.parentElement.remove(); saveData(); calculateVlsm();" class="btn-danger">X</button>`;
+        document.getElementById('vlsm-hosts-container').appendChild(div);
+    }
+    
+    function addVlsmRow() { addVlsmRowHTML(); saveData(); }
+
+    function calculateVlsm() {
+        const baseIpStr = document.getElementById('vlsm-base-ip').value;
+        const baseCidr = parseInt(document.getElementById('vlsm-base-cidr').value);
+        let baseIp = ipToInt(baseIpStr);
+        if(baseIp === null || isNaN(baseCidr)) return;
+        
+        baseIp = (baseIp & getMask(baseCidr)) >>> 0;
+        const maxCapacity = Math.pow(2, 32 - baseCidr);
+        let locs = appState.vlsmLocations.map(l => ({n: l.name, req: parseInt(l.hosts)})).filter(l => l.req > 0).sort((a,b)=>b.req-a.req);
+        
+        let html = "", currentIp = baseIp, totalUsedSize = 0, overflow = false;
+        
+        locs.forEach(l => {
+            let bits = 0; while(Math.pow(2,bits)-2 < l.req) bits++;
+            let cidr = 32-bits, size = Math.pow(2,bits);
+            
+            let rem = currentIp % size; if(rem !== 0) currentIp += (size-rem);
+            totalUsedSize += size;
+            if(totalUsedSize > maxCapacity) overflow = true;
+            
+            if(!overflow) {
+                html += `<tr><td><strong>${l.n}</strong></td><td>${l.req}</td><td>${size-2}</td><td>${intToIp(currentIp)}</td><td>/${cidr} (${intToIp(getMask(cidr))})</td><td>${intToIp(currentIp+size-1)}</td></tr>`;
+                currentIp += size;
+            }
+        });
+        
+        document.getElementById('vlsm-results').innerHTML = html;
+        document.getElementById('vlsm-capacity-warning').style.display = overflow ? 'block' : 'none';
+    }
+
+
+    // --- TAB 3: ROUTING & TOPOLOGIE ---
+    function createNewRouter() {
+        const name = prompt("Wie soll der neue Router heissen?", "Router0" + (appState.routers.length + 1));
+        if(!name) return;
+        appState.routers.push({ id: name, x: 450, y: 300, routes: [] });
+        selectedRouterIdx = appState.routers.length - 1;
+        saveData(); initRoutingEditor();
+    }
+
+    function deleteCurrentRouter() {
+        if(appState.routers.length <= 1) { alert("Es muss mindestens ein Router bleiben."); return; }
+        if(confirm(`Willst du ${appState.routers[selectedRouterIdx].id} wirklich löschen?`)) {
+            appState.routers.splice(selectedRouterIdx, 1);
+            selectedRouterIdx = 0; saveData(); initRoutingEditor();
+        }
+    }
+
+    function initRoutingEditor() {
+        const sel = document.getElementById('router-select'); sel.innerHTML = '';
+        appState.routers.forEach((r, i) => sel.add(new Option(r.id, i)));
+        document.getElementById('router-select').value = selectedRouterIdx;
+        loadRouterTable();
+    }
+
+    function loadRouterTable() {
+        selectedRouterIdx = parseInt(document.getElementById('router-select').value);
+        renderTable(); drawNetwork();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('route-tbody'); tbody.innerHTML = '';
+        appState.routers[selectedRouterIdx].routes.forEach((route, routeIdx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" value="${route.net}" oninput="updateRoute(${routeIdx}, 'net', this.value)"></td>
+                <td><input type="text" value="${route.mask}" oninput="updateRoute(${routeIdx}, 'mask', this.value)"></td>
+                <td><input type="text" value="${route.gw}" oninput="updateRoute(${routeIdx}, 'gw', this.value)"></td>
+                <td><input type="text" value="${route.int}" oninput="updateRoute(${routeIdx}, 'int', this.value)"></td>
+                <td><input type="number" value="${route.metric}" oninput="updateRoute(${routeIdx}, 'metric', this.value)"></td>
+                <td><button class="btn-danger" onclick="deleteRoute(${routeIdx})">X</button></td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function updateRoute(routeIdx, field, value) { appState.routers[selectedRouterIdx].routes[routeIdx][field] = value; saveData(); drawNetwork(); }
+    function addRoute() { appState.routers[selectedRouterIdx].routes.push({ net: '', mask: '', gw: '', int: '', metric: 1 }); saveData(); renderTable(); drawNetwork(); }
+    function deleteRoute(idx) { appState.routers[selectedRouterIdx].routes.splice(idx, 1); saveData(); renderTable(); drawNetwork(); }
+
+    function exportRoutingTables() {
+        const box = document.getElementById('routing-table-output');
+        let txt = "GESAMTE ROUTING TABELLEN ÜBERSICHT\n=======================================================================\n\n";
+        appState.routers.forEach(r => {
+            txt += `--- ${r.id} ---\n`;
+            txt += `Network`.padEnd(18) + `Subnetmask`.padEnd(18) + `Gateway`.padEnd(18) + `Interface`.padEnd(18) + `Metric\n`;
+            r.routes.forEach(route => {
+                txt += `${(route.net||'').padEnd(18)}${(route.mask||'').padEnd(18)}${(route.gw||'').padEnd(18)}${(route.int||'').padEnd(18)}${route.metric||''}\n`;
+            });
+            txt += "\n";
+        });
+        box.textContent = txt; box.style.display = 'block';
+    }
+
+
+    window.editRouterName = function(routerId) {
+        let r = appState.routers.find(rt => rt.id === routerId);
+        if(!r) return;
+        let newName = prompt("Neuer Name für diesen Router:", r.id);
+        if(newName && newName.trim() !== "" && newName !== r.id) {
+            r.id = newName.trim();
+            saveData(); initRoutingEditor();
+        }
+    };
+
+    window.editNetworkIp = function(oldNetIp) {
+        let newNetIp = prompt(`Neues Netzwerk für ${oldNetIp}:`, oldNetIp);
+        if(newNetIp && newNetIp.trim() !== "" && newNetIp !== oldNetIp) {
+            appState.routers.forEach(r => {
+                r.routes.forEach(route => {
+                    if(route.net === oldNetIp) route.net = newNetIp;
+                });
+            });
+            saveData(); loadRouterTable();
+        }
+    };
+
+    window.editInterfaceIp = function(routerId, oldIntIp) {
+        let newIp = prompt(`Neue IP für Interface ${oldIntIp} an ${routerId}:`, oldIntIp);
+        if(newIp && newIp.trim() !== "" && newIp !== oldIntIp) {
+            let owner = appState.routers.find(rt => rt.id === routerId);
+            owner.routes.forEach(route => {
+                if(route.int === oldIntIp) {
+                    route.int = newIp;
+                    if(route.gw === oldIntIp) route.gw = newIp; 
+                }
+            });
+            appState.routers.forEach(r => {
+                if(r.id !== routerId) {
+                    r.routes.forEach(route => {
+                        if(route.gw === oldIntIp) route.gw = newIp;
+                    });
+                }
+            });
+            saveData(); loadRouterTable();
+        }
+    };
+
+    function drawNetwork() {
+        const svg = document.getElementById('network-svg'); 
+        let linesHtml = '', cloudsHtml = '', routersHtml = '', labelsHtml = ''; 
+        let networks = {};
+        
+        appState.routers.forEach((r) => {
+            r.routes.forEach(route => {
+                if (route.net !== '0.0.0.0' && ((route.gw && route.int && route.gw === route.int) || parseInt(route.metric) === 1)) {
+                    if (!networks[route.net]) networks[route.net] = { mask: route.mask, routers: [] };
+                }
+            });
+        });
+
+        appState.routers.forEach(r => {
+            let intIps = new Set();
+            r.routes.forEach(route => { if(route.int) intIps.add(route.int); });
+            
+            intIps.forEach(intIp => {
+                Object.keys(networks).forEach(netIp => {
+                    let netData = networks[netIp];
+                    if (isIpInSubnet(intIp, netIp, netData.mask)) {
+                        if (!netData.routers.some(entry => entry.router.id === r.id)) {
+                            netData.routers.push({ router: r, intIp: intIp });
+                        }
+                    }
+                });
+            });
+        });
+
+        Object.keys(networks).forEach(netIp => {
+            let netData = networks[netIp];
+            let cx, cy;
+
+            if (netData.routers.length === 2) {
+                let r1 = netData.routers[0].router, r2 = netData.routers[1].router;
+                cx = (r1.x + r2.x) / 2; cy = (r1.y + r2.y) / 2;
+
+                linesHtml += `<line x1="${r1.x}" y1="${r1.y}" x2="${cx}" y2="${cy}" class="connection-line" />`;
+                linesHtml += `<line x1="${r2.x}" y1="${r2.y}" x2="${cx}" y2="${cy}" class="connection-line" />`;
+
+                labelsHtml += `<text x="${r1.x + (cx-r1.x)*0.3}" y="${r1.y + (cy-r1.y)*0.3 - 5}" class="ip-text" text-anchor="${cx>r1.x ? 'start' : 'end'}" onclick="editInterfaceIp('${r1.id}', '${netData.routers[0].intIp}')">${netData.routers[0].intIp}</text>`;
+                labelsHtml += `<text x="${r2.x + (cx-r2.x)*0.3}" y="${r2.y + (cy-r2.y)*0.3 - 5}" class="ip-text" text-anchor="${cx>r2.x ? 'start' : 'end'}" onclick="editInterfaceIp('${r2.id}', '${netData.routers[1].intIp}')">${netData.routers[1].intIp}</text>`;
+
+            } else if (netData.routers.length === 1) {
+                let r1 = netData.routers[0].router;
+                cx = r1.x; cy = r1.y + 110;
+
+                linesHtml += `<line x1="${r1.x}" y1="${r1.y}" x2="${cx}" y2="${cy}" class="connection-line" />`;
+                labelsHtml += `<text x="${r1.x + 8}" y="${r1.y + 55}" class="ip-text" text-anchor="start" onclick="editInterfaceIp('${r1.id}', '${netData.routers[0].intIp}')">${netData.routers[0].intIp}</text>`;
+            }
+
+            if (cx !== undefined && cy !== undefined) {
+                cloudsHtml += `<ellipse cx="${cx}" cy="${cy}" rx="65" ry="40" fill="var(--card-bg)" stroke="var(--text-main)" stroke-width="1.5" />`;
+                cloudsHtml += `<text x="${cx}" y="${cy - 3}" font-size="14" font-weight="bold" fill="var(--text-main)" text-anchor="middle" class="editable-text" onclick="editNetworkIp('${netIp}')">${netIp}</text>`;
+                cloudsHtml += `<text x="${cx}" y="${cy + 15}" font-size="12" fill="var(--text-muted)" text-anchor="middle" pointer-events="none">${netData.mask}</text>`;
+            }
+        });
+
+        appState.routers.forEach((r, i) => {
+            let stroke = i === selectedRouterIdx ? 'var(--accent)' : 'var(--router-border)';
+            let strokeW = i === selectedRouterIdx ? '5' : '3';
+            routersHtml += `<circle cx="${r.x}" cy="${r.y}" r="35" class="router-node" stroke="${stroke}" stroke-width="${strokeW}" data-idx="${i}"/>
+                            <text x="${r.x}" y="${r.y}" class="router-text" onclick="editRouterName('${r.id}')">${r.id}</text>`;
+        });
+        
+        svg.innerHTML = linesHtml + cloudsHtml + routersHtml + labelsHtml;
+    }
+
+    let dragTarget = null, offsetX, offsetY, isDragging = false;
+    function initDragAndDrop() {
+        const svg = document.getElementById('network-svg');
+        function getMousePos(evt) { let CTM = svg.getScreenCTM(); return { x: (evt.clientX - CTM.e) / CTM.a, y: (evt.clientY - CTM.f) / CTM.d }; }
+        
+        svg.addEventListener('mousedown', e => {
+            if(e.target.classList.contains('router-node')) {
+                let idx = e.target.getAttribute('data-idx'); dragTarget = appState.routers[idx];
+                selectedRouterIdx = idx; isDragging = false;
+                document.getElementById('router-select').value = idx; loadRouterTable();
+                let pos = getMousePos(e); offsetX = pos.x - dragTarget.x; offsetY = pos.y - dragTarget.y;
+            }
+        });
+        svg.addEventListener('mousemove', e => {
+            if(dragTarget) { 
+                e.preventDefault(); isDragging = true;
+                let pos = getMousePos(e); dragTarget.x = pos.x - offsetX; dragTarget.y = pos.y - offsetY; drawNetwork(); 
+            }
+        });
+        svg.addEventListener('mouseup', () => { if(dragTarget && isDragging){ saveData(); } dragTarget = null; isDragging = false; });
+        svg.addEventListener('mouseleave', () => { if(dragTarget){ saveData(); dragTarget = null; isDragging = false;} });
+    }
+
+    // --- TAB 4: NAT / PAT LOGIC ---
+    function saveAndRenderNat() {
+        saveData();
+        renderNatTable();
+    }
+
+    function renderNatTable() {
+        const tbody = document.getElementById('nat-tbody');
+        tbody.innerHTML = '';
+        
+        appState.natEntries.forEach((entry, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" value="${entry.privIp}" oninput="updateNatEntry(${idx}, 'privIp', this.value)"></td>
+                <td><input type="text" value="${entry.privPort}" oninput="updateNatEntry(${idx}, 'privPort', this.value)"></td>
+                <td><input type="text" value="${entry.pubIp}" oninput="updateNatEntry(${idx}, 'pubIp', this.value)"></td>
+                <td><input type="text" value="${entry.pubPort}" oninput="updateNatEntry(${idx}, 'pubPort', this.value)"></td>
+                <td><input type="text" value="${entry.destIp}" oninput="updateNatEntry(${idx}, 'destIp', this.value)"></td>
+                <td style="text-align: center;"><button class="btn-danger" onclick="deleteNatEntry(${idx})">X</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        const sel = document.getElementById('nat-session-select');
+        let currentVal = sel.value;
+        sel.innerHTML = '';
+        appState.natEntries.forEach((entry, idx) => {
+            sel.add(new Option(`PC: ${entry.privIp} (Port ${entry.privPort})`, idx));
+        });
+        
+        if (appState.natEntries.length > 0) {
+            sel.value = (currentVal && currentVal < appState.natEntries.length) ? currentVal : 0;
+            updateNatVisualization();
+        } else {
+            clearNatVisualization();
+        }
+    }
+
+    function updateNatEntry(idx, field, value) {
+        appState.natEntries[idx][field] = value;
+        saveData();
+        updateNatVisualization();
+        
+        if(field === 'privIp' || field === 'privPort') {
+            const sel = document.getElementById('nat-session-select');
+            sel.options[idx].text = `PC: ${appState.natEntries[idx].privIp} (Port ${appState.natEntries[idx].privPort})`;
+        }
+    }
+
+    function addNatEntry() {
+        if(!appState.natEntries) appState.natEntries = [];
+        appState.natEntries.push({ privIp: '192.168.1.X', privPort: '1024', pubIp: '80.10.1.X', pubPort: '5000', destIp: '65.30.34.X' });
+        saveAndRenderNat();
+    }
+
+    function deleteNatEntry(idx) {
+        appState.natEntries.splice(idx, 1);
+        saveAndRenderNat();
+    }
+
+    function updateNatVisualization() {
+        const sel = document.getElementById('nat-session-select');
+        if(!sel || sel.options.length === 0) return;
+        
+        const idx = parseInt(sel.value);
+        const entry = appState.natEntries[idx];
+        const destPort = document.getElementById('nat-dest-port').value || '80';
+
+        // Update Text Tables
+        document.getElementById('hin1-zip').textContent = entry.destIp || '?';
+        document.getElementById('hin1-qip').textContent = entry.privIp || '?';
+        document.getElementById('hin1-zp').textContent = destPort;
+        document.getElementById('hin1-qp').textContent = entry.privPort || '?';
+
+        document.getElementById('hin2-zip').textContent = entry.destIp || '?';
+        document.getElementById('hin2-qip').textContent = entry.pubIp ? entry.pubIp + ' (NAT)' : '?';
+        document.getElementById('hin2-zp').textContent = destPort;
+        document.getElementById('hin2-qp').textContent = entry.pubPort ? entry.pubPort + ' (PAT)' : '?';
+
+        document.getElementById('rueck1-zip').textContent = entry.pubIp || '?';
+        document.getElementById('rueck1-qip').textContent = entry.destIp || '?';
+        document.getElementById('rueck1-zp').textContent = entry.pubPort || '?';
+        document.getElementById('rueck1-qp').textContent = destPort;
+
+        document.getElementById('rueck2-zip').textContent = entry.privIp ? entry.privIp + ' (NAT)' : '?';
+        document.getElementById('rueck2-qip').textContent = entry.destIp || '?';
+        document.getElementById('rueck2-zp').textContent = entry.privPort ? entry.privPort + ' (PAT)' : '?';
+        document.getElementById('rueck2-qp').textContent = destPort;
+
+        // Update SVG Graphic
+        document.getElementById('svg-pc-ip').textContent = entry.privIp || '?';
+        document.getElementById('svg-server-ip').textContent = entry.destIp || '?';
+
+        document.getElementById('s-req1-sip').textContent = entry.privIp || '?';
+        document.getElementById('s-req1-sp').textContent = entry.privPort || '?';
+        document.getElementById('s-req1-dip').textContent = entry.destIp || '?';
+        document.getElementById('s-req1-dp').textContent = destPort;
+
+        document.getElementById('s-req2-sip').textContent = entry.pubIp || '?';
+        document.getElementById('s-req2-sp').textContent = entry.pubPort || '?';
+        document.getElementById('s-req2-dip').textContent = entry.destIp || '?';
+        document.getElementById('s-req2-dp').textContent = destPort;
+
+        document.getElementById('s-res1-sip').textContent = entry.destIp || '?';
+        document.getElementById('s-res1-sp').textContent = destPort;
+        document.getElementById('s-res1-dip').textContent = entry.pubIp || '?';
+        document.getElementById('s-res1-dp').textContent = entry.pubPort || '?';
+
+        document.getElementById('s-res2-sip').textContent = entry.destIp || '?';
+        document.getElementById('s-res2-sp').textContent = destPort;
+        document.getElementById('s-res2-dip').textContent = entry.privIp || '?';
+        document.getElementById('s-res2-dp').textContent = entry.privPort || '?';
+    }
+
+    function clearNatVisualization() {
+        ['hin1-zip','hin1-qip','hin1-zp','hin1-qp', 'hin2-zip','hin2-qip','hin2-zp','hin2-qp',
+         'rueck1-zip','rueck1-qip','rueck1-zp','rueck1-qp', 'rueck2-zip','rueck2-qip','rueck2-zp','rueck2-qp'].forEach(id => document.getElementById(id).textContent = '-');
+         
+        ['svg-pc-ip', 'svg-server-ip', 's-req1-sip', 's-req1-sp', 's-req1-dip', 's-req1-dp', 's-req2-sip', 's-req2-sp', 's-req2-dip', 's-req2-dp', 's-res1-sip', 's-res1-sp', 's-res1-dip', 's-res1-dp', 's-res2-sip', 's-res2-sp', 's-res2-dip', 's-res2-dp'].forEach(id => document.getElementById(id).textContent = '-');
+    }
+</script>
+</body>
+</html>
